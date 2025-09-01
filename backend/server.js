@@ -13,8 +13,21 @@ const User = require("./models/User");
 // Create an Express app instance
 const app = express();
 
-// Enable CORS for all requests (to allow frontend access)
-app.use(cors());
+// Allowed origins array for CORS
+const allowedOrigins = ["https://sample-login-plum.vercel.app"];
+
+// Enable CORS for specified origins only (and allow no-origin requests like Postman)
+app.use(cors({
+  origin: function(origin, callback) {
+    if (!origin) return callback(null, true);  // Allow requests with no origin (e.g. Postman)
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = "The CORS policy for this site does not allow access from the specified Origin.";
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
+  credentials: true, // Enable cookies and credential headers if needed
+}));
 
 // Parse incoming JSON request bodies and populate req.body property
 app.use(express.json());

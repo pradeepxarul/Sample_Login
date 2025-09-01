@@ -21,7 +21,7 @@ export default function LoginPage() {
 
     try {
       // Send POST request to backend login API with username and password in JSON format
-      const res = await fetch("http://localhost:5000/api/login", {
+      const res = await fetch("https://sample-login-sz4w.onrender.com/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" }, // Tell server request body is JSON
         body: JSON.stringify(form), // Convert JS form state object to JSON string
