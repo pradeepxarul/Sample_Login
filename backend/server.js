@@ -10,7 +10,6 @@ const app = express();
 /**
  * CORS Configuration
  * Defines which origins are allowed to access our API
- * This prevents unauthorized cross-origin requests
  */
 const allowedOrigins = [
   "https://sample-login-plum.vercel.app",
@@ -37,16 +36,11 @@ app.use(cors({
 }));
 
 // Middleware to parse incoming JSON requests
-// This populates req.body with the parsed JSON data
 app.use(express.json({ limit: '10mb' }));
-
-// Middleware to parse URL-encoded data from forms
 app.use(express.urlencoded({ extended: true }));
 
 /**
  * Database Connection
- * Connect to MongoDB Atlas using Mongoose
- * Includes error handling and connection monitoring
  */
 const connectDB = async () => {
   try {
@@ -61,7 +55,7 @@ const connectDB = async () => {
     console.log(`MongoDB Connected: ${conn.connection.host}`);
   } catch (error) {
     console.error("MongoDB connection error:", error);
-    process.exit(1); // Exit process with failure
+    process.exit(1);
   }
 };
 
@@ -70,12 +64,6 @@ connectDB();
 
 /**
  * Input validation helper function
- * Validates and sanitizes user input to prevent injection attacks
- * @param {string} input - Input string to validate
- * @param {string} fieldName - Name of the field being validated
- * @param {number} minLength - Minimum required length
- * @param {number} maxLength - Maximum allowed length
- * @returns {Object} - Validation result with isValid boolean and error message
  */
 const validateInput = (input, fieldName, minLength = 1, maxLength = 100) => {
   if (!input || typeof input !== 'string') {
@@ -97,12 +85,9 @@ const validateInput = (input, fieldName, minLength = 1, maxLength = 100) => {
 
 /**
  * POST /api/signup - User Registration Endpoint
- * Creates a new user account with name, username, and password
- * Includes comprehensive validation and error handling
  */
 app.post("/api/signup", async (req, res) => {
   try {
-    // Extract user data from request body
     const { name, username, password } = req.body;
     
     console.log(`Signup attempt for username: ${username}`);
@@ -137,7 +122,7 @@ app.post("/api/signup", async (req, res) => {
       return res.status(400).json({ error: passwordValidation.error });
     }
     
-    // Check if username already exists in database
+    // Check if username already exists
     const existingUser = await User.findOne({ 
       username: usernameValidation.value.toLowerCase() 
     });
@@ -149,11 +134,11 @@ app.post("/api/signup", async (req, res) => {
       });
     }
     
-    // Create new user document
+    // Create new user
     const newUser = new User({
       name: nameValidation.value,
       username: usernameValidation.value.toLowerCase(),
-      password: passwordValidation.value // In production, hash this password!
+      password: passwordValidation.value
     });
     
     // Save user to database
@@ -161,41 +146,38 @@ app.post("/api/signup", async (req, res) => {
     
     console.log(`User created successfully: ${savedUser.username}`);
     
-    // Return success response (password is automatically excluded by schema transform)
+    // Return success response
     res.status(201).json({ 
       message: "Account created successfully! You can now log in.",
-      user: savedUser
+      user: {
+        name: savedUser.name,
+        username: savedUser.username
+      }
     });
     
   } catch (error) {
     console.error("Signup error:", error);
     
-    // Handle specific MongoDB errors
     if (error.name === 'ValidationError') {
       const errorMessage = Object.values(error.errors)[0].message;
       return res.status(400).json({ error: errorMessage });
     }
     
     if (error.code === 11000) {
-      // Duplicate key error (username already exists)
       return res.status(409).json({ 
         error: "Username already exists. Please choose a different one." 
       });
     }
     
-    // Generic server error
     res.status(500).json({ error: "Internal server error. Please try again." });
   }
 });
 
 /**
  * POST /api/login - User Authentication Endpoint
- * Authenticates user with username and password
- * Enhanced with better validation and security logging
  */
 app.post("/api/login", async (req, res) => {
   try {
-    // Extract credentials from request body
     const { username, password } = req.body;
     
     console.log(`Login attempt for username: ${username}`);
@@ -214,7 +196,7 @@ app.post("/api/login", async (req, res) => {
       return res.status(400).json({ error: passwordValidation.error });
     }
     
-    // Find user in database (case-insensitive username search)
+    // Find user in database
     const user = await User.findOne({ 
       username: usernameValidation.value.toLowerCase() 
     });
@@ -222,11 +204,10 @@ app.post("/api/login", async (req, res) => {
     // Check if user exists
     if (!user) {
       console.warn(`Login failed: User not found: ${usernameValidation.value}`);
-      // Use generic message to prevent username enumeration attacks
       return res.status(401).json({ error: "Invalid username or password" });
     }
     
-    // Verify password (in production, use bcrypt.compare for hashed passwords)
+    // Verify password
     if (user.password !== passwordValidation.value) {
       console.warn(`Login failed: Invalid password for user: ${user.username}`);
       return res.status(401).json({ error: "Invalid username or password" });
@@ -235,10 +216,13 @@ app.post("/api/login", async (req, res) => {
     // Authentication successful
     console.log(`Login successful for user: ${user.username}`);
     
-    // Return success response with user info (password excluded by schema)
+    // Return success response
     res.json({ 
-      message: `Welcome back, ${user.name}!`,
-      user: user
+      message: `Welcome back, ${user.name || user.username}!`,
+      user: {
+        name: user.name || user.username,
+        username: user.username
+      }
     });
     
   } catch (error) {
@@ -249,11 +233,9 @@ app.post("/api/login", async (req, res) => {
 
 /**
  * Health check endpoint
- * Useful for monitoring server status and database connectivity
  */
 app.get("/api/health", async (req, res) => {
   try {
-    // Check database connection
     const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
     
     res.json({
@@ -270,27 +252,10 @@ app.get("/api/health", async (req, res) => {
   }
 });
 
-/**
- * Catch-all route for undefined endpoints
- * Returns 404 for any route that doesn't exist
- */
-app.use('*', (req, res) => {
-  res.status(404).json({ error: 'Route not found' });
-});
-
-/**
- * Global error handling middleware
- * Catches any unhandled errors and returns appropriate response
- */
-app.use((error, req, res, next) => {
-  console.error('Unhandled error:', error);
-  res.status(500).json({ error: 'Internal server error' });
-});
-
-// Define server port (use environment variable or default to 5000)
+// Define server port
 const PORT = process.env.PORT || 5000;
 
-// Start the server and listen for incoming requests
+// Start the server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Health check available at: http://localhost:${PORT}/api/health`);
