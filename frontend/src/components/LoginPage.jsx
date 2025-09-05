@@ -1,102 +1,115 @@
 import React, { useState } from "react";
+import axios from 'axios';
 
-// Functional React component for the login page UI and logic
+/**
+ * LoginPage component - handles user authentication
+ * Uses axios instead of fetch for HTTP requests
+ * Provides form validation and error handling
+ */
 export default function LoginPage() {
-  // useState hook to create `form` state object with username and password fields
-  // `setForm` updates the form state
-  const [form, setForm] = useState({ username: "", password: "" });
+  // State to store form input values (username and password)
+  const [form, setForm] = useState({ 
+    username: "", 
+    password: "" 
+  });
+  
+  // State to store and display error messages to user
+  const [error, setError] = useState("");
+  
+  // State to show loading status during API calls
+  const [loading, setLoading] = useState(false);
 
-  // useState hook for `error` message string shown below form
-  const [error, setError] = useState("");
+  /**
+   * Handles input field changes for both username and password
+   * Updates the form state dynamically based on input name attribute
+   * @param {Event} e - Input change event
+   */
+  const handleChange = (e) => {
+    setForm({ 
+      ...form, 
+      [e.target.name]: e.target.value 
+    });
+  };
 
-  // Handles change in input fields (username/password)
-  const handleChange = (e) =>
-    // Update form state by copying existing and replacing only the changed field based on input name
-    setForm({ ...form, [e.target.name]: e.target.value });
+  /**
+   * Handles login form submission
+   * Sends POST request to backend login API using axios
+   * Shows success message or error based on response
+   * @param {Event} e - Form submit event
+   */
+  const handleSubmit = async (e) => {
+    e.preventDefault(); // Prevent default form submission behavior
+    setError(""); // Clear any existing error messages
+    setLoading(true); // Show loading state
+    
+    try {
+      // Send POST request using axios with form data
+      const response = await axios.post("https://sample-login-sz4w.onrender.com/api/login", form, {
+        headers: {
+          "Content-Type": "application/json"
+        },
+        timeout: 10000 // 10 second timeout
+      });
+      
+      // Show success message on successful login
+      alert(response.data.message);
+      
+      // Optionally clear form after successful login
+      setForm({ username: "", password: "" });
+      
+    } catch (error) {
+      // Handle different types of errors
+      if (error.response) {
+        // Server responded with error status
+        setError(error.response.data.error || "Login failed");
+      } else if (error.request) {
+        // Request was made but no response received
+        setError("No response from server. Please check your connection.");
+      } else {
+        // Something else happened
+        setError("An unexpected error occurred");
+      }
+    } finally {
+      setLoading(false); // Hide loading state
+    }
+  };
 
-  // Handles login form submission
-  const handleSubmit = async (e) => {
-    e.preventDefault(); // Prevent default browser form submission which reloads page
-    setError(""); // Clear any existing error messages
-
-    try {
-      // Send POST request to backend login API with username and password in JSON format
-      const res = await fetch("https://sample-login-sz4w.onrender.com/api/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" }, // Tell server request body is JSON
-        body: JSON.stringify(form), // Convert JS form state object to JSON string
-      });
-
-      const data = await res.json(); // Parse JSON response body from server
-
-      if (!res.ok) setError(data.error); // If HTTP status not 2xx, show backend error message
-      else alert(data.message); // Show alert on successful login
-    } catch {
-      setError("Server error"); // Handle network or unexpected errors
-    }
-  };
-
-  // Render login form UI
-  return (
-    <div
-      style={{
-        maxWidth: 400,
-        margin: "4rem auto",
-        padding: 20,
-        border: "1px solid #ddd",
-        borderRadius: 8,
-      }}
-    >
-      <h1 style={{ textAlign: "center", marginBottom: 20 }}>Login</h1>
-
-      {/* Form element handles submission with handleSubmit */}
-      <form onSubmit={handleSubmit}>
-
-        {/* Username input field */}
-        <label>
-          Username
-          <input
-            name="username" // Input's name attribute must match form state key
-            value={form.username} // Controlled component value linked to React state
-            onChange={handleChange} // Update state on input change
-            required
-            style={{ width: "100%", marginBottom: 10, padding: 8 }}
-          />
-        </label>
-        <br />
-
-        {/* Password input field */}
-        <label>
-          Password
-          <input
-            name="password"
-            type="password" // Mask input as password field
-            value={form.password}
-            onChange={handleChange}
-            required
-            style={{ width: "100%", marginBottom: 10, padding: 8 }}
-          />
-        </label>
-        <br />
-
-        {/* Show error message if error state is non-empty */}
-        {error && <p style={{ color: "red", marginBottom: 10 }}>{error}</p>}
-
-        {/* Submit button */}
-        <button
-          type="submit"
-          style={{
-            width: "100%",
-            padding: 10,
-            backgroundColor: "#007bff",
-            color: "white",
-            border: "none",
-            borderRadius: 4,
-          }}
-        >
-          Login
-        </button>
-      </form>
-    </div>
-  );
+  // Render login form UI
+  return (
+    <div className="login-container">
+      <h2>Login</h2>
+      <form onSubmit={handleSubmit} className="login-form">
+        <div className="form-group">
+          <input
+            type="text"
+            name="username"
+            value={form.username}
+            onChange={handleChange}
+            placeholder="Enter your username"
+            required
+            disabled={loading}
+          />
+        </div>
+        
+        <div className="form-group">
+          <input
+            type="password"
+            name="password"
+            value={form.password}
+            onChange={handleChange}
+            placeholder="Enter your password"
+            required
+            disabled={loading}
+          />
+        </div>
+        
+        <button type="submit" disabled={loading}>
+          {loading ? "Logging in..." : "Login"}
+        </button>
+        
+        {/* Display error message if exists */}
+        {error && <p className="error-message">{error}</p>}
+      </form>
+    </div>
+  );
 }
